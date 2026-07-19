@@ -75,14 +75,14 @@ export default function Home() {
   const nav = ["Resumen", "Productos", "Pedidos", "Movimientos"];
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">A</span><div><strong>Almacén</strong><small>Control de inventario</small></div></div>
+      <div className="brand"><span className="brand-mark">A</span><div><strong>Almacenes Orozco</strong><small>Control de inventario</small></div></div>
       <nav>{nav.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><span>{item === "Resumen" ? "⌂" : item === "Productos" ? "□" : item === "Pedidos" ? "≡" : "↕"}</span>{item}</button>)}</nav>
       <div className="sidebar-help"><b>¿Todo en orden?</b><p>Revisa las alertas para evitar faltantes.</p><button onClick={() => setTab("Productos")}>Ver inventario</button></div>
       <div className="user"><span>LP</span><div><b>Luis Peraza</b><small>Administrador</small></div></div>
     </aside>
 
     <main>
-      <header><div className="mobile-brand">Almacén</div><label className="search">⌕<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar producto, SKU..." /></label><div className="header-actions"><button className="ghost" onClick={() => { setTab("Productos"); setQuery(""); }}>⌕</button><button className={`primary ${products.length === 0 ? "disabled" : ""}`} onClick={() => products.length ? setModal("order") : flash("Primero registra al menos un producto")}>＋ Nuevo pedido</button></div></header>
+      <header><div className="mobile-brand">Almacenes Orozco</div><label className="search">⌕<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar producto, SKU..." /></label><div className="header-actions"><button className="ghost" onClick={() => { setTab("Productos"); setQuery(""); }}>⌕</button><button className={`primary ${products.length === 0 ? "disabled" : ""}`} onClick={() => products.length ? setModal("order") : flash("Primero registra al menos un producto")}>＋ Nuevo pedido</button></div></header>
       <div className="content">
         <section className="page-title"><div><p className="eyebrow">OPERACIÓN DIARIA</p><h1>{tab}</h1><p>{tab === "Resumen" ? "Aquí tienes el estado de tu negocio hoy." : tab === "Productos" ? "Consulta, crea, edita y administra tu catálogo." : tab === "Pedidos" ? "Pedidos recientes y consumo de inventario." : "Historial consolidado de entradas y salidas."}</p></div>{tab === "Productos" && <button className="primary" onClick={openCreate}>＋ Agregar producto</button>}</section>
 
