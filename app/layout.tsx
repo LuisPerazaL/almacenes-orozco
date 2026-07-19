@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Almacén — Inventario y pedidos",
+  title: "Almacenes Orozco — Inventario y pedidos",
   description: "Control de productos, stock, reabastecimiento y pedidos.",
   other: {
     "codex-preview": "development",
