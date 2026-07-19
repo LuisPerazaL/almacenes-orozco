@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase-browser";
 
 type Product = { id: number; name: string; sku: string; category: string; stock: number; min: number; price: number };
 type Order = { id: string; customer: string; productId: number; quantity: number; date: string; status: "Completado" | "Pendiente" };
@@ -19,27 +21,28 @@ export default function Home() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 3000); };
 
   const loadData = useCallback(async () => {
+    if (!session) { setLoading(false); return; }
     try {
-      const response = await fetch("/api/state", { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setProducts(data.products); setOrders(data.orders);
-      if (data.products.length && !data.products.some((p: Product) => p.id === selectedId)) setSelectedId(data.products[0].id);
+      const [{ data: productRows, error: productError }, { data: orderRows, error: orderError }] = await Promise.all([supabase.from("products").select("*").order("name"), supabase.from("orders").select("*").order("created_at", { ascending: false })]);
+      if (productError || orderError) throw productError ?? orderError;
+      const nextProducts = (productRows ?? []).map((p) => ({ id: p.id, name: p.name, sku: p.sku, category: p.category, stock: p.stock, min: p.min_stock, price: Number(p.price) }));
+      const nextOrders = (orderRows ?? []).map((o) => ({ id: `PED-${String(1000 + o.id).padStart(4, "0")}`, customer: o.customer, productId: o.product_id, quantity: o.quantity, date: new Date(o.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }), status: o.status as "Completado" | "Pendiente" }));
+      setProducts(nextProducts); setOrders(nextOrders);
+      if (nextProducts.length && !nextProducts.some((p: Product) => p.id === selectedId)) setSelectedId(nextProducts[0].id);
     } catch (error) { flash(error instanceof Error ? error.message : "No fue posible cargar el inventario"); }
     finally { setLoading(false); }
-  }, [selectedId]);
+  }, [selectedId, session]);
 
-  async function mutate(payload: Record<string, unknown>) {
-    const response = await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    await loadData();
-  }
-
+  useEffect(() => { void supabase.auth.getSession().then(({ data }) => setSession(data.session)); const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next)); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { void loadData(); }, [loadData]);
+  async function authenticate(mode: "login" | "signup") { setAuthBusy(true); const result = mode === "login" ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password }); setAuthBusy(false); if (result.error) flash(result.error.message); else flash(mode === "login" ? "Sesión iniciada" : "Cuenta creada; revisa tu correo si requiere confirmación"); }
 
   const lowStock = products.filter((p) => p.stock <= p.min);
   const inventoryValue = products.reduce((sum, p) => sum + p.stock * p.price, 0);
@@ -49,7 +52,7 @@ export default function Home() {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
     const values = { name: String(fd.get("name")).trim(), sku: String(fd.get("sku")).trim().toUpperCase(), category: String(fd.get("category")), stock: Number(fd.get("stock")), min: Number(fd.get("min")), price: Number(fd.get("price")) };
     if (products.some((p) => p.sku.toLowerCase() === values.sku.toLowerCase() && p.id !== editingId)) { flash("Ya existe un producto con ese SKU"); return; }
-    try { await mutate({ action: "saveProduct", product: { ...values, id: editingId } }); setEditingId(null); setModal(null); flash(editingId ? "Producto actualizado correctamente" : "Producto agregado correctamente"); }
+    try { const row = { name: values.name, sku: values.sku, category: values.category, stock: values.stock, min_stock: values.min, price: values.price, owner_id: session!.user.id }; const result = editingId ? await supabase.from("products").update(row).eq("id", editingId) : await supabase.from("products").insert(row); if (result.error) throw result.error; await loadData(); setEditingId(null); setModal(null); flash(editingId ? "Producto actualizado correctamente" : "Producto agregado correctamente"); }
     catch (error) { flash(error instanceof Error ? error.message : "No fue posible guardar el producto"); }
   }
   function openCreate() { setEditingId(null); setModal("product"); }
@@ -57,32 +60,33 @@ export default function Home() {
   function requestDelete(id: number) { setSelectedId(id); setModal("delete"); }
   async function deleteProduct() {
     if (orders.some((o) => o.productId === selectedId)) { setModal(null); flash("No se puede eliminar: el producto tiene pedidos asociados"); return; }
-    try { await mutate({ action: "deleteProduct", id: selectedId }); setModal(null); flash("Producto eliminado"); }
+    try { const { error } = await supabase.from("products").delete().eq("id", selectedId); if (error) throw error; await loadData(); setModal(null); flash("Producto eliminado"); }
     catch (error) { setModal(null); flash(error instanceof Error ? error.message : "No fue posible eliminar el producto"); }
   }
   async function createOrder(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const fd = new FormData(e.currentTarget); const productId = Number(fd.get("product")); const quantity = Number(fd.get("quantity")); const item = productById(productId);
     if (!item || quantity < 1 || quantity > item.stock) { flash("No hay stock suficiente para este pedido"); return; }
-    try { await mutate({ action: "createOrder", customer: String(fd.get("customer")), productId, quantity }); setModal(null); flash("Pedido creado y stock actualizado"); }
+    try { const { error } = await supabase.rpc("create_order", { p_customer: String(fd.get("customer")), p_product_id: productId, p_quantity: quantity }); if (error) throw error; await loadData(); setModal(null); flash("Pedido creado y stock actualizado"); }
     catch (error) { flash(error instanceof Error ? error.message : "No fue posible crear el pedido"); }
   }
   async function restock(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); const amount = Number(new FormData(e.currentTarget).get("amount"));
-    try { await mutate({ action: "restock", productId: selectedId, amount }); setModal(null); flash("Entrada registrada y pedidos pendientes reevaluados"); }
+    try { const { error } = await supabase.rpc("restock_and_fulfill", { p_product_id: selectedId, p_amount: amount }); if (error) throw error; await loadData(); setModal(null); flash("Entrada registrada y pedidos pendientes reevaluados"); }
     catch (error) { flash(error instanceof Error ? error.message : "No fue posible registrar la entrada"); }
   }
 
   const nav = ["Resumen", "Productos", "Pedidos", "Movimientos"];
+  if (!session) return <main className="auth-page"><section className="auth-card"><div className="brand auth-brand"><span className="brand-mark">A</span><div><strong>Almacenes Orozco</strong><small>Inventario en la nube</small></div></div><p className="eyebrow">ACCESO SEGURO</p><h1>Bienvenido</h1><p>Inicia sesión para administrar tus productos y pedidos.</p><label>Correo<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" /></label><label>Contraseña<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} /></label><button className="primary" disabled={authBusy} onClick={() => void authenticate("login")}>Iniciar sesión</button><button className="cancel" disabled={authBusy} onClick={() => void authenticate("signup")}>Crear cuenta</button>{toast && <div className="toast">{toast}</div>}</section></main>;
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">A</span><div><strong>Almacenes Orozco</strong><small>Control de inventario</small></div></div>
+      <div className="brand"><span className="brand-mark">A</span><div><strong>Almacén</strong><small>Control de inventario</small></div></div>
       <nav>{nav.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><span>{item === "Resumen" ? "⌂" : item === "Productos" ? "□" : item === "Pedidos" ? "≡" : "↕"}</span>{item}</button>)}</nav>
       <div className="sidebar-help"><b>¿Todo en orden?</b><p>Revisa las alertas para evitar faltantes.</p><button onClick={() => setTab("Productos")}>Ver inventario</button></div>
-      <div className="user"><span>LP</span><div><b>Luis Peraza</b><small>Administrador</small></div></div>
+      <button className="user user-button" onClick={() => void supabase.auth.signOut()}><span>{session.user.email?.slice(0,2).toUpperCase()}</span><div><b>{session.user.email}</b><small>Cerrar sesión</small></div></button>
     </aside>
 
     <main>
-      <header><div className="mobile-brand">Almacenes Orozco</div><label className="search">⌕<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar producto, SKU..." /></label><div className="header-actions"><button className="ghost" onClick={() => { setTab("Productos"); setQuery(""); }}>⌕</button><button className={`primary ${products.length === 0 ? "disabled" : ""}`} onClick={() => products.length ? setModal("order") : flash("Primero registra al menos un producto")}>＋ Nuevo pedido</button></div></header>
+      <header><div className="mobile-brand">Almacén</div><label className="search">⌕<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar producto, SKU..." /></label><div className="header-actions"><button className="ghost" onClick={() => { setTab("Productos"); setQuery(""); }}>⌕</button><button className={`primary ${products.length === 0 ? "disabled" : ""}`} onClick={() => products.length ? setModal("order") : flash("Primero registra al menos un producto")}>＋ Nuevo pedido</button></div></header>
       <div className="content">
         <section className="page-title"><div><p className="eyebrow">OPERACIÓN DIARIA</p><h1>{tab}</h1><p>{tab === "Resumen" ? "Aquí tienes el estado de tu negocio hoy." : tab === "Productos" ? "Consulta, crea, edita y administra tu catálogo." : tab === "Pedidos" ? "Pedidos recientes y consumo de inventario." : "Historial consolidado de entradas y salidas."}</p></div>{tab === "Productos" && <button className="primary" onClick={openCreate}>＋ Agregar producto</button>}</section>
 
