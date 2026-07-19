@@ -25,17 +25,24 @@ create policy "order_items_owner" on public.order_items for all to authenticated
 drop function if exists public.create_order(text,bigint,integer);
 create or replace function public.create_order(p_customer text, p_items jsonb)
 returns bigint language plpgsql security invoker as $$
-declare new_order_id bigint; requested jsonb; available integer; reserve_now integer; total_reserved integer := 0; total_requested integer := 0;
+declare new_order_id bigint; requested jsonb; requested_product_id bigint; available integer; reserve_now integer; total_reserved integer := 0; total_requested integer := 0;
 begin
   if jsonb_array_length(p_items) < 1 then raise exception 'El pedido debe incluir productos'; end if;
   insert into public.orders(owner_id, customer, status) values (auth.uid(), p_customer, 'Pendiente') returning id into new_order_id;
   for requested in select * from jsonb_array_elements(p_items) loop
     if (requested->>'quantity')::integer < 1 then raise exception 'Cantidad inválida'; end if;
-    select stock into available from public.products where id = (requested->>'product_id')::bigint and owner_id = auth.uid() for update;
+    requested_product_id := nullif(requested->>'product_id','')::bigint;
+    if requested_product_id is null then
+      if nullif(trim(requested->>'product_name'),'') is null then raise exception 'Captura el nombre del producto'; end if;
+      insert into public.products(owner_id,name,sku,category,stock,min_stock,price)
+      values(auth.uid(),trim(requested->>'product_name'),coalesce(nullif(upper(trim(requested->>'sku')),''),'PEND-'||upper(substr(md5(random()::text),1,8))),'Por catalogar',0,1,0)
+      returning id into requested_product_id;
+    end if;
+    select stock into available from public.products where id = requested_product_id and owner_id = auth.uid() for update;
     if not found then raise exception 'Producto no encontrado'; end if;
     reserve_now := least(available, (requested->>'quantity')::integer);
-    update public.products set stock = stock - reserve_now, updated_at = now() where id = (requested->>'product_id')::bigint and owner_id = auth.uid();
-    insert into public.order_items(owner_id, order_id, product_id, quantity, reserved_quantity) values (auth.uid(), new_order_id, (requested->>'product_id')::bigint, (requested->>'quantity')::integer, reserve_now);
+    update public.products set stock = stock - reserve_now, updated_at = now() where id = requested_product_id and owner_id = auth.uid();
+    insert into public.order_items(owner_id, order_id, product_id, quantity, reserved_quantity) values (auth.uid(), new_order_id, requested_product_id, (requested->>'quantity')::integer, reserve_now);
     total_reserved := total_reserved + reserve_now; total_requested := total_requested + (requested->>'quantity')::integer;
   end loop;
   update public.orders set status = case when total_reserved = total_requested then 'Completado' when total_reserved > 0 then 'Parcial' else 'Pendiente' end,
