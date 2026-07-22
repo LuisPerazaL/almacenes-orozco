@@ -171,7 +171,19 @@ export default function Home() {
     finally { setBusy(false); }
   }
   async function chooseAlternative(itemId:number,alternativeId:number){const {error}=await supabase.rpc("select_order_alternative",{p_item_id:itemId,p_alternative_id:alternativeId});if(error)flash(error.message);else{await loadData();flash("Opción seleccionada");}}
-  function toggleCatalogImage(lineIndex:number,pic:CatalogImage){setOrderLines(all=>all.map((line,index)=>{if(index!==lineIndex)return line;const alternatives=line.alternatives??[],exists=alternatives.some(a=>a.imageUrl===pic.image_url);return {...line,alternatives:exists?alternatives.filter(a=>a.imageUrl!==pic.image_url):[...alternatives,{label:pic.name,imageUrl:pic.image_url}]};}));}
+  function toggleCatalogImage(lineIndex:number,pic:CatalogImage){
+    const imageSku=catalogSkuFromUrl(pic.image_url);
+    const linkedProduct=imageSku?products.find((product)=>product.sku.toUpperCase()===imageSku):undefined;
+    setOrderLines(all=>all.map((line,index)=>{
+      if(index!==lineIndex)return line;
+      const alternatives=line.alternatives??[];
+      const exists=alternatives.some(a=>a.imageUrl===pic.image_url);
+      if(exists)return {...line,alternatives:alternatives.filter(a=>a.imageUrl!==pic.image_url)};
+      if(!linkedProduct)return {...line,alternatives:[...alternatives,{label:pic.name,imageUrl:pic.image_url}]};
+      const sameProduct=line.productId===linkedProduct.id;
+      return {...line,productId:linkedProduct.id,productName:"",sku:"",alternatives:sameProduct?[...alternatives,{label:pic.name,imageUrl:pic.image_url}]:[{label:pic.name,imageUrl:pic.image_url}]};
+    }));
+  }
 
   const activeOrders=orders.filter(o=>!["Entregado","Cancelado"].includes(o.status));
   const historyOrders=orders.filter(o=>["Entregado","Cancelado"].includes(o.status));
