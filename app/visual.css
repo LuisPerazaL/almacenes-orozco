@@ -49,3 +49,134 @@
   .order-line,.new-product-fields{grid-template-columns:1fr}
   .order-line>*,.new-product-fields>*{grid-column:1}
 }
+
+/* Responsive safeguards for the full app shell. */
+html,body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
+}
+.app-shell,
+.app-shell>main,
+.content,
+.panel,
+.kpis>article,
+.kpis article>div,
+.dashboard-grid>*,
+.stock-info{
+  min-width:0;
+}
+img{max-width:100%}
+
+@media(max-width:1200px){
+  .catalog-form{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .catalog-form>*{
+    width:100%;
+    min-width:0;
+  }
+  .bulk-import{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .bulk-import>div:first-child{
+    grid-column:1/-1;
+  }
+}
+
+@media(max-width:1050px){
+  .sidebar .brand{
+    justify-content:center;
+    padding-left:0;
+    padding-right:0;
+  }
+  .sidebar .brand>div,
+  .sidebar .sidebar-help,
+  .sidebar .user>div{
+    display:none;
+  }
+  .sidebar nav button{
+    width:100%;
+    min-width:0;
+  }
+  header{
+    padding-left:28px;
+    padding-right:28px;
+  }
+  .content{
+    width:100%;
+    padding:28px;
+  }
+  .kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .dashboard-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+
+@media(max-width:680px){
+  .sidebar nav{
+    display:grid;
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:2px;
+    width:100%;
+  }
+  .sidebar nav button,
+  .sidebar nav button.active{
+    width:100%;
+    min-width:0;
+    padding:9px 0;
+  }
+  .content{
+    padding:22px 16px 90px;
+  }
+  .toolbar{
+    flex-wrap:wrap;
+    gap:10px;
+    padding:14px;
+  }
+  .toolbar .search.inner{
+    display:flex;
+    width:100%;
+    flex-basis:100%;
+  }
+  .panel-head{
+    gap:12px;
+  }
+  .bulk-import{
+    grid-template-columns:1fr;
+  }
+  .bulk-import>div:first-child{
+    grid-column:auto;
+  }
+}
+
+@media(max-width:420px){
+  header{
+    padding-left:14px;
+    padding-right:14px;
+  }
+  .mobile-brand{
+    font-size:14px;
+  }
+  .header-actions>.primary{
+    display:grid;
+    place-items:center;
+    width:42px;
+    height:42px;
+    padding:0;
+    font-size:0;
+  }
+  .header-actions>.primary::after{
+    content:"+";
+    font-size:20px;
+    line-height:1;
+  }
+}
+
+@media(max-width:380px){
+  .kpis{
+    grid-template-columns:1fr;
+  }
+}
