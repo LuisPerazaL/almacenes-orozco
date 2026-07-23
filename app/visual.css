@@ -3,3 +3,41 @@
 @media(max-width:1000px){.catalog-form{grid-template-columns:1fr 1fr 1fr}.catalog-form button{min-height:43px}}
 @media(max-width:1000px){.bulk-import{grid-template-columns:1fr 1fr}.bulk-import>div:first-child{grid-column:1/-1}}
 @media(max-width:680px){.bulk-import{grid-template-columns:1fr}.bulk-import>div:first-child{grid-column:auto}.catalog-form{grid-template-columns:1fr}.catalog-grid,.gallery-grid{grid-template-columns:repeat(2,1fr)}.gallery-modal{padding:22px 13px}.sidebar nav button{padding:9px 10px}}
+
+/* Keep every order control inside the modal, even with long product names. */
+.modal{overflow-x:hidden}
+.order-line{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(86px,105px);
+  gap:10px;
+  position:relative;
+}
+.order-line>*{min-width:0}
+.order-line>label{margin:0}
+.order-line input,.order-line select{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+.new-product-fields{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.new-product-fields label{min-width:0}
+.selected-pics,.gallery-button,.line-alert{grid-column:1/-1}
+.selected-pics{max-width:100%}
+.gallery-button{
+  width:100%;
+  margin-top:0;
+  white-space:normal;
+}
+.line-alert{display:block}
+.remove-line{position:absolute;right:-8px;top:-8px}
+
+@media(max-width:560px){
+  .order-line,.new-product-fields{grid-template-columns:1fr}
+  .order-line>*,.new-product-fields>*{grid-column:1}
+}
