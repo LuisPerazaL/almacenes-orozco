@@ -4,8 +4,16 @@
 @media(max-width:1000px){.bulk-import{grid-template-columns:1fr 1fr}.bulk-import>div:first-child{grid-column:1/-1}}
 @media(max-width:680px){.bulk-import{grid-template-columns:1fr}.bulk-import>div:first-child{grid-column:auto}.catalog-form{grid-template-columns:1fr}.catalog-grid,.gallery-grid{grid-template-columns:repeat(2,1fr)}.gallery-modal{padding:22px 13px}.sidebar nav button{padding:9px 10px}}
 
-/* Keep every order control inside the modal, even with long product names. */
-.modal{overflow-x:hidden}
+/* Keep long order forms inside the viewport and make their content scrollable. */
+.modal-backdrop{overflow-y:auto}
+.modal{
+  max-height:calc(100dvh - 40px);
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  -webkit-overflow-scrolling:touch;
+}
 .order-line{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(86px,105px);
